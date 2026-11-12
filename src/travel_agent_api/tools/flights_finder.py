@@ -7,6 +7,36 @@ from typing import Optional
 
 load_dotenv()
 
+MAX_FLIGHTS = 5
+
+
+def _summarize_flights(results: dict) -> dict:
+    """Riduce la risposta di SerpApi ai soli campi utili all'agente."""
+    options = results.get("best_flights", []) + results.get("other_flights", [])
+    flights = []
+    for option in options[:MAX_FLIGHTS]:
+        flights.append({
+            "price": option.get("price"),
+            "total_duration": option.get("total_duration"),
+            "carbon_emissions_kg": (option.get("carbon_emissions") or {}).get("this_flight", 0) // 1000,
+            "layovers": [layover.get("name") for layover in option.get("layovers", [])],
+            "legs": [
+                {
+                    "airline": leg.get("airline"),
+                    "flight_number": leg.get("flight_number"),
+                    "departure": leg.get("departure_airport"),
+                    "arrival": leg.get("arrival_airport"),
+                    "duration": leg.get("duration"),
+                }
+                for leg in option.get("flights", [])
+            ],
+        })
+    return {
+        "google_flights_url": results.get("search_metadata", {}).get("google_flights_url"),
+        "error": results.get("error"),
+        "flights": flights,
+    }
+
 
 class FlightsInput(BaseModel):
     departure_airport: str = Field(description="The departure airport code (IATA).")
@@ -54,7 +84,7 @@ def flights_finder(params: FlightsInput):
         print("*" * 80)
         print("flights_finder")
         print("*" * 80)
-        return search.get_dict()
+        return _summarize_flights(search.get_dict())
 
     except Exception as e:
         return str(e)

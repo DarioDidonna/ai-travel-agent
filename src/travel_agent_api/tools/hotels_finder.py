@@ -8,6 +8,27 @@ from enum import IntEnum
 
 load_dotenv()
 
+MAX_HOTELS = 5
+
+
+def _summarize_hotel(hotel: dict) -> dict:
+    """Riduce i dati di un hotel di SerpApi ai soli campi utili all'agente."""
+    images = hotel.get("images") or [{}]
+    return {
+        "name": hotel.get("name"),
+        "description": hotel.get("description"),
+        "link": hotel.get("link"),
+        "image": images[0].get("thumbnail"),
+        "hotel_class": hotel.get("hotel_class"),
+        "rate_per_night": (hotel.get("rate_per_night") or {}).get("lowest"),
+        "total_rate": (hotel.get("total_rate") or {}).get("lowest"),
+        "check_in_time": hotel.get("check_in_time"),
+        "check_out_time": hotel.get("check_out_time"),
+        "overall_rating": hotel.get("overall_rating"),
+        "reviews": hotel.get("reviews"),
+        "amenities": hotel.get("amenities", [])[:8],
+    }
+
 
 class HotelClassEnum(IntEnum):
     TWO = 2
@@ -68,7 +89,8 @@ def hotels_finder(params: HotelsInput):
 
     try:
         search = GoogleSearch(params)
-        results = search.get_dict()["properties"]
+        properties = search.get_dict().get("properties", [])
+        results = [_summarize_hotel(hotel) for hotel in properties[:MAX_HOTELS]]
     except Exception as e:
         print("Error: ", e)
         results = str(e)
