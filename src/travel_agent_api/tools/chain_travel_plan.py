@@ -58,7 +58,7 @@ def chain_travel_plan(params: TravelPlanInput) -> TravelPlanOutput:
     Returns:
         TravelPlanOutput: The generated travel plan content.
     """
-    model = get_chat_model()
+    model = get_chat_model(light=True)
 
     system_prompt = f"""
     You are a travel expert.

@@ -16,7 +16,7 @@ def chain_historical_expert(input_text: str) -> str:
     Returns:
         str: Il contenuto generato dal modello.
     """
-    model = get_chat_model()
+    model = get_chat_model(light=True)
 
     system_prompt = """
     You are an historical expert.
