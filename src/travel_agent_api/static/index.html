@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Travel Agent AI</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">✈️</span>
+      <div>
+        <h1>Travel Agent AI</h1>
+        <p>Voli, hotel e itinerari con dati reali da Google Flights e Google Hotels</p>
+      </div>
+    </div>
+    <div class="actions">
+      <button type="button" id="new-chat" class="ghost">Nuova chat</button>
+      <a class="ghost" href="/docs" target="_blank" rel="noopener">API docs</a>
+    </div>
+  </header>
+
+  <main id="chat" aria-live="polite">
+    <section id="welcome" class="welcome">
+      <h2>Dove vuoi andare? 🌍</h2>
+      <p>Descrivi il tuo viaggio: l'agente cerca voli e hotel reali e prepara un itinerario giorno per giorno.</p>
+      <div class="examples">
+        <button type="button" class="example">Voli e hotel da Milano Linate a Parigi dal 5 al 9 febbraio 2027 per 2 adulti, con un itinerario culturale e vegetariano</button>
+        <button type="button" class="example">Trovami un hotel a Napoli dal 3 al 5 marzo 2027</button>
+        <button type="button" class="example">Raccontami in breve la storia del Colosseo</button>
+      </div>
+    </section>
+    <div id="messages"></div>
+  </main>
+
+  <form id="composer" class="composer">
+    <div id="key-row" class="key-row" hidden>
+      <label for="api-key">Chiave di accesso</label>
+      <input id="api-key" type="password" autocomplete="off" placeholder="X-API-Key">
+    </div>
+    <div class="input-row">
+      <textarea id="input" rows="1" maxlength="4000" placeholder="Scrivi il tuo messaggio…" required></textarea>
+      <button type="submit" id="send">Invia</button>
+    </div>
+    <p class="hint">Un viaggio completo può richiedere da 30 secondi a qualche minuto: l'agente interroga servizi reali.</p>
+  </form>
+
+  <script src="/static/vendor/marked.min.js"></script>
+  <script src="/static/vendor/purify.min.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
