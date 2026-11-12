@@ -119,12 +119,9 @@ class Agent:
         {TRAVEL_PLAN_OUTPUT}
         """
 
-    def run(self, messages: list):
+    def run(self, messages: list) -> str:
+        """Esegue l'agente sulla conversazione e restituisce il testo della risposta finale."""
         # Il prompt di sistema è già nell'agente: lo stato contiene solo la conversazione
         response = self.agent_executor.invoke({"messages": messages})
-        messages = response["messages"]
-        # Gemini 3 restituisce il contenuto come lista di blocchi: lo riportiamo a testo
-        for message in messages:
-            if isinstance(message.content, list):
-                message.content = message.text
-        return messages
+        # .text funziona anche quando Gemini 3 restituisce il contenuto come lista di blocchi
+        return str(response["messages"][-1].text)

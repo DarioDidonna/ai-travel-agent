@@ -37,7 +37,7 @@ def test_prompt_di_sistema_passato_a_create_agent(monkeypatch):
     assert str(agent.current_datetime.date()) in captured["system_prompt"]
 
 
-def test_run_restituisce_la_conversazione_senza_prompt_di_sistema(monkeypatch):
+def test_run_restituisce_solo_la_risposta_finale(monkeypatch):
     agent, executor, _ = build_agent(monkeypatch, AIMessage("Ecco il tuo viaggio"))
     messages = [{"role": "user", "content": "Vorrei andare a Roma"}]
 
@@ -45,7 +45,8 @@ def test_run_restituisce_la_conversazione_senza_prompt_di_sistema(monkeypatch):
 
     # Il prompt di sistema non viene più mescolato ai messaggi dell'utente
     assert executor.received == {"messages": messages}
-    assert [m.content for m in result] == ["Vorrei andare a Roma", "Ecco il tuo viaggio"]
+    assert result == "Ecco il tuo viaggio"
+    assert type(result) is str
 
 
 def test_contenuto_a_blocchi_riportato_a_testo(monkeypatch):
@@ -54,4 +55,4 @@ def test_contenuto_a_blocchi_riportato_a_testo(monkeypatch):
 
     result = agent.run([{"role": "user", "content": "Ciao"}])
 
-    assert result[-1].content == "Ciao Roma"
+    assert result == "Ciao Roma"

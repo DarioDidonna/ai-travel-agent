@@ -1,9 +1,10 @@
 import logging
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from langchain_core.exceptions import ModelError
 from pydantic import BaseModel, Field, StringConstraints, field_validator
+from travel_agent_api.security import rate_limit, verify_api_key
 from travel_agent_api.services.agent_service import Agent
 
 logger = logging.getLogger(__name__)
@@ -44,26 +45,42 @@ class ChatComplentionRequest(BaseModel):
             }
         }
     }
-    
-@router.post("/travel-agent") 
+
+
+class ChatCompletionResponse(BaseModel):
+    role: Literal["assistant"] = "assistant"
+    content: str
+
+
+@router.post(
+    "/travel-agent",
+    response_model=ChatCompletionResponse,
+    dependencies=[Depends(rate_limit), Depends(verify_api_key)],
+    responses={
+        401: {"description": "Chiave di accesso mancante o non valida (solo se API_ACCESS_KEY è impostata)"},
+        422: {"description": "Messaggi non validi"},
+        429: {"description": "Troppe richieste: riprovare dopo i secondi indicati in Retry-After"},
+        503: {"description": "Servizio di intelligenza artificiale non disponibile"},
+    },
+)
 def chat_completion(request: ChatComplentionRequest):
     """
     Endpoint per la gestione delle richieste di chat.
-    Processa i messaggi ricevuti e restituisce una risposta dall'agente di viaggio.
+    Processa i messaggi ricevuti e restituisce la risposta finale dell'agente di viaggio.
 
     Args:
         request (ChatComplentionRequest): La richiesta contenente i messaggi della conversazione
-        
+
     Returns:
-        dict: La risposta elaborata dall'agente di viaggio 
-        
+        ChatCompletionResponse: La risposta dell'assistente, in markdown
+
     Raises:
-        HTTPException: In caso di errori durante l'elaborazione della richiesta 
+        HTTPException: In caso di errori durante l'elaborazione della richiesta
     """
-    
+
     try:
         agent = Agent()
-        response = agent.run(messages=[message.model_dump() for message in request.messages])
+        reply = agent.run(messages=[message.model_dump() for message in request.messages])
     except ModelError:
         # Gemini/OpenAI/Ollama non raggiungibile, quota esaurita, chiave non valida...
         logger.exception("Errore del provider del modello")
@@ -80,5 +97,5 @@ def chat_completion(request: ChatComplentionRequest):
     print("*" * 80)
     print("chat_completion")
     print("*" * 80)
-    return response
+    return ChatCompletionResponse(content=reply)
     

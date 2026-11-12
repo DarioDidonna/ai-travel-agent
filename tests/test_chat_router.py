@@ -14,7 +14,7 @@ class FakeAgent:
 
     def run(self, messages):
         FakeAgent.received = messages
-        return [{"type": "ai", "content": "Risposta di prova"}]
+        return "Risposta di prova"
 
 
 @pytest.fixture
@@ -32,7 +32,8 @@ def test_richiesta_valida_risponde_200(client):
     response = client.post(URL, json={"messages": [user()]})
 
     assert response.status_code == 200
-    assert response.json() == [{"type": "ai", "content": "Risposta di prova"}]
+    # Solo la risposta finale: nessun messaggio interno dei tool
+    assert response.json() == {"role": "assistant", "content": "Risposta di prova"}
     assert FakeAgent.received == [user()]
 
 
