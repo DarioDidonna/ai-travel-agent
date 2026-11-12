@@ -1,6 +1,6 @@
 # ✈️ Travel Agent API
 
-[![CI](https://github.com/DarioDidonna/progetto_finale_AI_Python/actions/workflows/ci.yml/badge.svg)](https://github.com/DarioDidonna/progetto_finale_AI_Python/actions/workflows/ci.yml)
+[![CI](https://github.com/DarioDidonna/ai-travel-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/DarioDidonna/ai-travel-agent/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.162-009688)
 
@@ -60,8 +60,8 @@ flowchart LR
 **Requisiti:** Python 3.11 o 3.12, [Poetry](https://python-poetry.org/) 2.x, una chiave [Gemini](https://aistudio.google.com) (gratuita) e una chiave [SerpApi](https://serpapi.com) (ha un piano gratuito).
 
 ```bash
-git clone https://github.com/DarioDidonna/progetto_finale_AI_Python.git
-cd progetto_finale_AI_Python
+git clone https://github.com/DarioDidonna/ai-travel-agent.git
+cd ai-travel-agent
 poetry install
 cp .env.example .env        # poi inserisci GEMINI_API_KEY e SERPAPI_API_KEY
 poetry run uvicorn travel_agent_api.main:app --reload --port 8080
