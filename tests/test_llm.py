@@ -38,6 +38,11 @@ def test_modelli_personalizzati_dal_env(monkeypatch):
     assert model_name(llm.get_chat_model(light=True)) == "modello-leggero"
 
 
+def test_gemini_non_riprova_all_infinito():
+    """Con la quota esaurita i tentativi ripetuti fanno solo aspettare l'utente."""
+    assert llm.get_chat_model().max_retries == 2
+
+
 def test_provider_non_valido(monkeypatch):
     monkeypatch.setenv("LLM_PROVIDER", "inesistente")
 

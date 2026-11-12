@@ -49,6 +49,8 @@ def get_chat_model(light: bool = False) -> BaseChatModel:
             model=model,
             api_key=os.getenv("GEMINI_API_KEY"),
             timeout=120,
+            # Il default (6) fa attendere minuti anche quando la quota giornaliera è finita
+            max_retries=2,
         )
 
     if provider == "ollama":
