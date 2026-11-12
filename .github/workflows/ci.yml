@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Il workflow legge soltanto il codice: nessun permesso di scrittura
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # Action fissate al commit esatto: un tag può essere spostato, uno SHA no
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Installa Poetry
+        run: pipx install poetry==2.4.3
+
+      - name: Installa le dipendenze (dal poetry.lock)
+        run: poetry install --no-interaction
+
+      # I test simulano l'agente e SerpApi: non servono chiavi né chiamate esterne
+      - name: Test
+        run: poetry run pytest -q
+
+      - name: Controllo vulnerabilità delle dipendenze
+        run: pipx run pip-audit --path "$(poetry run python -c 'import site; print(site.getsitepackages()[0])')"
