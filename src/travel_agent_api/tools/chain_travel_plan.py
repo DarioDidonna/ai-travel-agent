@@ -1,5 +1,5 @@
 from langchain_core.tools import tool
-from langchain_openai import ChatOpenAI
+from travel_agent_api.llm import get_chat_model
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 from typing import Optional
@@ -58,7 +58,7 @@ def chain_travel_plan(params: TravelPlanInput) -> TravelPlanOutput:
     Returns:
         TravelPlanOutput: The generated travel plan content.
     """
-    model = ChatOpenAI(model_name="gpt-4o")
+    model = get_chat_model()
 
     system_prompt = f"""
     You are a travel expert.

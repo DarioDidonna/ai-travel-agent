@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from langchain_openai import ChatOpenAI
+from travel_agent_api.llm import get_chat_model
 from langgraph.prebuilt import create_react_agent
 
 # Tools
@@ -86,7 +86,7 @@ format: markdown
 class Agent:
     def __init__(self):
         self.current_datetime = datetime.now()
-        self.model = ChatOpenAI(model_name="gpt-4o")
+        self.model = get_chat_model()
         self.tools = [
             chain_historical_expert,
             flights_finder,
@@ -116,4 +116,9 @@ class Agent:
         """
         convesation_history = [{"role": "system", "content": SYSTEM_PROMPT}] + messages
         response = self.agent_executor.invoke({"messages": convesation_history})
-        return response["messages"][1:]
+        messages = response["messages"][1:]
+        # Gemini 3 restituisce il contenuto come lista di blocchi: lo riportiamo a testo
+        for message in messages:
+            if isinstance(message.content, list):
+                message.content = message.text
+        return messages

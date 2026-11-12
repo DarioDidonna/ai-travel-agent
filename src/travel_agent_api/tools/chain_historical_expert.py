@@ -1,6 +1,6 @@
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.tools import tool
-from langchain_openai import ChatOpenAI
+from travel_agent_api.llm import get_chat_model
 
 
 @tool
@@ -16,7 +16,7 @@ def chain_historical_expert(input_text: str) -> str:
     Returns:
         str: Il contenuto generato dal modello.
     """
-    model = ChatOpenAI(model_name="gpt-4o")
+    model = get_chat_model()
 
     system_prompt = """
     You are an historical expert.
@@ -42,4 +42,4 @@ def chain_historical_expert(input_text: str) -> str:
     print("chain_historical_expert")
     print("*" * 80)
 
-    return result.content
+    return result.text
