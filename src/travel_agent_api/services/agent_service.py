@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from travel_agent_api.llm import get_chat_model
-from langgraph.prebuilt import create_react_agent
+from langchain.agents import create_agent
 
 # Tools
 from travel_agent_api.tools.flights_finder import flights_finder
@@ -93,10 +93,14 @@ class Agent:
             hotels_finder,
             chain_travel_plan,
         ]
-        self.agent_executor = create_react_agent(self.model, self.tools)
+        self.agent_executor = create_agent(
+            model=self.model,
+            tools=self.tools,
+            system_prompt=self._system_prompt(),
+        )
 
-    def run(self, messages: list):
-        SYSTEM_PROMPT = f"""
+    def _system_prompt(self) -> str:
+        return f"""
         Sei un travel planner. Il tuo compito è organizzare il viaggio per l'utente.
         Aggiungi delle emojis per rendere il tuo output più interessante.
         Rispondi sempre in italiano e traduci in italiano anche le etichette che
@@ -114,9 +118,11 @@ class Agent:
         Esempio Output Viaggio:
         {TRAVEL_PLAN_OUTPUT}
         """
-        convesation_history = [{"role": "system", "content": SYSTEM_PROMPT}] + messages
-        response = self.agent_executor.invoke({"messages": convesation_history})
-        messages = response["messages"][1:]
+
+    def run(self, messages: list):
+        # Il prompt di sistema è già nell'agente: lo stato contiene solo la conversazione
+        response = self.agent_executor.invoke({"messages": messages})
+        messages = response["messages"]
         # Gemini 3 restituisce il contenuto come lista di blocchi: lo riportiamo a testo
         for message in messages:
             if isinstance(message.content, list):
