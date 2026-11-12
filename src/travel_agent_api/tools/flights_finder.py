@@ -1,3 +1,4 @@
+import logging
 import os
 from dotenv import load_dotenv
 from langchain_core.tools import tool
@@ -6,6 +7,8 @@ from pydantic import BaseModel , Field
 from typing import Optional
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 MAX_FLIGHTS = 5
 
@@ -87,7 +90,9 @@ def flights_finder(params: FlightsInput):
         return _summarize_flights(search.get_dict())
 
     except Exception as e:
-        return str(e)
+        # Il messaggio dell'errore può contenere l'URL con la api_key: non va né al modello né nel log
+        logger.error("Errore SerpApi nella ricerca voli: %s", type(e).__name__)
+        return {"error": "Ricerca voli non disponibile al momento."}
     
     
     

@@ -1,8 +1,12 @@
+import logging
 from typing import Annotated, Literal
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
+from langchain_core.exceptions import ModelError
 from pydantic import BaseModel, Field, StringConstraints, field_validator
 from travel_agent_api.services.agent_service import Agent
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -57,8 +61,22 @@ def chat_completion(request: ChatComplentionRequest):
         HTTPException: In caso di errori durante l'elaborazione della richiesta 
     """
     
-    agent = Agent()
-    response = agent.run(messages=[message.model_dump() for message in request.messages])
+    try:
+        agent = Agent()
+        response = agent.run(messages=[message.model_dump() for message in request.messages])
+    except ModelError:
+        # Gemini/OpenAI/Ollama non raggiungibile, quota esaurita, chiave non valida...
+        logger.exception("Errore del provider del modello")
+        raise HTTPException(
+            status_code=503,
+            detail="Il servizio di intelligenza artificiale non è al momento disponibile. "
+            "Riprova tra qualche minuto.",
+        )
+    except Exception:
+        # I dettagli restano nel log del server, al client arriva un messaggio generico
+        logger.exception("Errore imprevisto durante l'elaborazione della chat")
+        raise HTTPException(status_code=500, detail="Si è verificato un errore interno. Riprova più tardi.")
+
     print("*" * 80)
     print("chat_completion")
     print("*" * 80)

@@ -1,3 +1,4 @@
+import logging
 import os
 from langchain_core.tools import tool
 from serpapi import GoogleSearch
@@ -7,6 +8,8 @@ from typing import Optional
 from enum import IntEnum
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 MAX_HOTELS = 5
 
@@ -92,8 +95,9 @@ def hotels_finder(params: HotelsInput):
         properties = search.get_dict().get("properties", [])
         results = [_summarize_hotel(hotel) for hotel in properties[:MAX_HOTELS]]
     except Exception as e:
-        print("Error: ", e)
-        results = str(e)
+        # Il messaggio dell'errore può contenere l'URL con la api_key: non va né al modello né nel log
+        logger.error("Errore SerpApi nella ricerca hotel: %s", type(e).__name__)
+        results = {"error": "Ricerca hotel non disponibile al momento."}
 
     print("*" * 80)
     print("hotels_finder")
