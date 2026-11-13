@@ -2,7 +2,7 @@ import logging
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
-from langchain_core.exceptions import ModelError
+from langchain_core.exceptions import ModelAPIError, ModelError, ModelRateLimitError
 from pydantic import BaseModel, Field, StringConstraints, field_validator
 from travel_agent_api.security import rate_limit, verify_api_key
 from travel_agent_api.services.agent_service import Agent
@@ -52,6 +52,27 @@ class ChatCompletionResponse(BaseModel):
     content: str
 
 
+def provider_unavailable(error: ModelError) -> HTTPException:
+    """Traduce l'errore del provider in un 503 che dice all'utente quando ha senso riprovare."""
+    if isinstance(error, ModelRateLimitError):
+        if "per day" in str(error).lower():
+            return HTTPException(
+                status_code=503,
+                detail="La quota giornaliera del servizio di intelligenza artificiale è esaurita. "
+                "Riprova domani oppure cambia modello (LLM_MODEL nel .env).",
+            )
+        detail = "Troppe richieste al servizio di intelligenza artificiale. Riprova tra un minuto."
+    elif isinstance(error, ModelAPIError):
+        detail = "Il servizio di intelligenza artificiale è sovraccarico. Riprova tra un minuto."
+    else:
+        return HTTPException(
+            status_code=503,
+            detail="Il servizio di intelligenza artificiale non è al momento disponibile. "
+            "Riprova tra qualche minuto.",
+        )
+    return HTTPException(status_code=503, detail=detail, headers={"Retry-After": "60"})
+
+
 @router.post(
     "/travel-agent",
     response_model=ChatCompletionResponse,
@@ -81,14 +102,10 @@ def chat_completion(request: ChatComplentionRequest):
     try:
         agent = Agent()
         reply = agent.run(messages=[message.model_dump() for message in request.messages])
-    except ModelError:
+    except ModelError as error:
         # Gemini/OpenAI/Ollama non raggiungibile, quota esaurita, chiave non valida...
         logger.exception("Errore del provider del modello")
-        raise HTTPException(
-            status_code=503,
-            detail="Il servizio di intelligenza artificiale non è al momento disponibile. "
-            "Riprova tra qualche minuto.",
-        )
+        raise provider_unavailable(error)
     except Exception:
         # I dettagli restano nel log del server, al client arriva un messaggio generico
         logger.exception("Errore imprevisto durante l'elaborazione della chat")

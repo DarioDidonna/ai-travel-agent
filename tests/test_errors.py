@@ -2,7 +2,7 @@ import json
 
 import pytest
 from fastapi.testclient import TestClient
-from langchain_core.exceptions import ModelRateLimitError
+from langchain_core.exceptions import ModelAPIError, ModelRateLimitError
 
 from travel_agent_api.main import app
 from travel_agent_api.routes import chat_router
@@ -27,14 +27,35 @@ def client():
     return TestClient(app, raise_server_exceptions=False)
 
 
-def test_provider_non_disponibile_risponde_503(client, monkeypatch):
-    error = ModelRateLimitError(f"429 quota esaurita {SECRET}")
+DAILY_QUOTA = (
+    "429 RESOURCE_EXHAUSTED. Quota exceeded for metric: "
+    "generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, "
+    "description: Generate content requests per day limit exceeded on Free Tier."
+)
+MINUTE_QUOTA = (
+    "429 RESOURCE_EXHAUSTED. Quota exceeded for metric: "
+    "generate_content_free_tier_requests, description: Generate content requests per minute "
+    "limit exceeded on Free Tier."
+)
+
+
+@pytest.mark.parametrize(
+    "error, expected, retry_after",
+    [
+        (ModelRateLimitError(f"{DAILY_QUOTA} {SECRET}"), "quota giornaliera", None),
+        (ModelRateLimitError(f"{MINUTE_QUOTA} {SECRET}"), "tra un minuto", "60"),
+        (ModelAPIError(f"503 UNAVAILABLE high demand {SECRET}"), "sovraccarico", "60"),
+    ],
+    ids=["quota-giornaliera", "troppe-richieste-al-minuto", "sovraccarico"],
+)
+def test_provider_non_disponibile_spiega_quando_riprovare(client, monkeypatch, error, expected, retry_after):
     monkeypatch.setattr(chat_router, "Agent", failing_agent(error))
 
     response = client.post(URL, json=BODY)
 
     assert response.status_code == 503
-    assert "non è al momento disponibile" in response.json()["detail"]
+    assert expected in response.json()["detail"]
+    assert response.headers.get("Retry-After") == retry_after
     assert SECRET not in response.text
 
 

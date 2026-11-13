@@ -16,8 +16,8 @@ Backend in **FastAPI + LangChain**, modello **Gemini** (piano gratuito) intercam
 
   | Tool | Cosa fa |
   |---|---|
-  | `flights_finder` | Cerca voli reali con SerpApi (Google Flights) |
-  | `hotels_finder` | Cerca hotel reali con SerpApi (Google Hotels) |
+  | `flights_finder` | Cerca voli reali con SerpApi (Google Flights); filtri: solo diretti, dal più economico, prezzo massimo |
+  | `hotels_finder` | Cerca hotel reali con SerpApi (Google Hotels); filtri: prezzo massimo per notte, dal più economico |
   | `chain_travel_plan` | Genera un itinerario strutturato (mattina / pomeriggio / sera) con output validato da Pydantic |
   | `chain_historical_expert` | Risponde a domande storiche e culturali |
 
@@ -128,7 +128,7 @@ curl -X POST http://127.0.0.1:8080/chat/travel-agent \
 poetry run pytest
 ```
 
-51 test automatici, eseguiti in meno di un secondo e **senza chiamate a servizi esterni**: l'agente e SerpApi vengono simulati. Coprono validazione, sicurezza (chiave, rate limit, CORS, header, fuga di chiavi), gestione degli errori, scelta del modello e pagina web.
+60 test automatici, eseguiti in meno di un secondo e **senza chiamate a servizi esterni**: l'agente e SerpApi vengono simulati. Coprono validazione, sicurezza (chiave, rate limit, CORS, header, fuga di chiavi), gestione degli errori, scelta del modello e pagina web.
 
 ## Struttura del progetto
 
