@@ -48,6 +48,15 @@ class FlightsInput(BaseModel):
     return_date: str = Field(description="The return date (YYYY-MM-DD) e.g. 2024-12-19.")
     adults: Optional[int] = Field(1, description="The number of adults. Defaults to 1.")
     children: Optional[int] = Field(0, description="The number of children. Defaults to 0.")
+    nonstop_only: bool = Field(
+        False, description="Set to true only when the user asks for direct / nonstop flights."
+    )
+    cheapest_first: bool = Field(
+        False, description="Set to true when the user asks for the cheapest flights: results sorted by price."
+    )
+    max_price: Optional[int] = Field(
+        None, description="Maximum total price in EUR for the round trip, only if the user gives a flight budget."
+    )
 
 class FlightsInputSchema(BaseModel):
     params : FlightsInput
@@ -64,17 +73,21 @@ def flights_finder(params: FlightsInput):
         return_date (str): The return date (YYYY-MM-DD) e.g. 2024-12-19.
         adults (int): The number of adults. Defaults to 1.
         children (int): The number of children. Defaults to 0.
+        nonstop_only (bool): Only direct flights. Defaults to false.
+        cheapest_first (bool): Sort results by price. Defaults to false.
+        max_price (int): Maximum total price in EUR. Optional.
     Returns:
-        dict: A dictionary containing the flights info. If the API call fails, it returns the error message as a string.
+        dict: A dictionary containing the flights info. If the API call fails, it returns an error message.
     """
     try:
-        params = {
+        search_params = {
             "api_key": os.getenv("SERPAPI_API_KEY"),
             "engine": "google_flights",
             "hl": "it",
             "gl": "it",
             "currency": "EUR",
-            "stops": "0",  # 0 = qualsiasi numero di scali (1 = solo voli diretti)
+            # 0 = qualsiasi numero di scali, 1 = solo voli diretti
+            "stops": "1" if params.nonstop_only else "0",
             "departure_id": params.departure_airport,
             "arrival_id": params.arrival_airport,
             "outbound_date": params.outbound_date,
@@ -82,7 +95,11 @@ def flights_finder(params: FlightsInput):
             "adults": params.adults,
             "children": params.children
         }
-        search = GoogleSearch(params)
+        if params.cheapest_first:
+            search_params["sort_by"] = "2"  # 2 = prezzo
+        if params.max_price:
+            search_params["max_price"] = str(params.max_price)
+        search = GoogleSearch(search_params)
         
         print("*" * 80)
         print("flights_finder")

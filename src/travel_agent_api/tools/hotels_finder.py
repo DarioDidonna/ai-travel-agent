@@ -55,6 +55,14 @@ class HotelsInput(BaseModel):
     hotel_class: Optional[int] = Field(
         2, description="The hotel class available from 2 to 5. Defaults to 2."
     )
+    max_price_per_night: Optional[int] = Field(
+        None,
+        description="Maximum price per night in EUR. If the user gives a total budget, "
+        "divide it by the number of nights.",
+    )
+    cheapest_first: bool = Field(
+        False, description="Set to true when the user asks for the cheapest hotels: results sorted by price."
+    )
 
 
 class HotelsInputSchema(BaseModel):
@@ -72,11 +80,15 @@ def hotels_finder(params: HotelsInput):
         adults (int): The number of adults. Defaults to 1.
         children (int): The number of children. Defaults to 0.
         hotel_class (int): The hotel class available from 2 to 5. Defaults to 2.
+        max_price_per_night (int): Maximum price per night in EUR. Optional.
+        cheapest_first (bool): Sort results by price. Defaults to false.
+    Note:
+        The number of rooms cannot be filtered: Google Hotels only accepts adults and children.
     Returns:
-        dict: A dictionary containing the hotels info. If the API call fails, it returns the error message as a string.
+        dict: A dictionary containing the hotels info. If the API call fails, it returns an error message.
     """
 
-    params = {
+    search_params = {
         "api_key": os.getenv("SERPAPI_API_KEY"),
         "engine": "google_hotels",
         "hl": "it",
@@ -89,9 +101,13 @@ def hotels_finder(params: HotelsInput):
         "children": params.children,
         "hotel_class": params.hotel_class,
     }
+    if params.max_price_per_night:
+        search_params["max_price"] = str(params.max_price_per_night)
+    if params.cheapest_first:
+        search_params["sort_by"] = "3"  # 3 = prezzo più basso
 
     try:
-        search = GoogleSearch(params)
+        search = GoogleSearch(search_params)
         properties = search.get_dict().get("properties", [])
         results = [_summarize_hotel(hotel) for hotel in properties[:MAX_HOTELS]]
     except Exception as e:

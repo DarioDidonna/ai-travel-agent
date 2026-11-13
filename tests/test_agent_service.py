@@ -37,6 +37,15 @@ def test_prompt_di_sistema_passato_a_create_agent(monkeypatch):
     assert str(agent.current_datetime.date()) in captured["system_prompt"]
 
 
+def test_prompt_spiega_come_gestire_richieste_vaghe_o_non_supportate(monkeypatch):
+    _, _, captured = build_agent(monkeypatch, AIMessage("ok"))
+    prompt = captured["system_prompt"]
+
+    assert "date precise" in prompt  # date vaghe: chiedere o dichiarare la scelta
+    assert "camere" in prompt  # filtro non disponibile: dirlo all'utente
+    assert "per notte" in prompt  # budget totale convertito in prezzo per notte
+
+
 def test_run_restituisce_solo_la_risposta_finale(monkeypatch):
     agent, executor, _ = build_agent(monkeypatch, AIMessage("Ecco il tuo viaggio"))
     messages = [{"role": "user", "content": "Vorrei andare a Roma"}]

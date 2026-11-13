@@ -107,6 +107,19 @@ class Agent:
         provengono dai dati dei tool (es. "Carbon emission estimate" -> "Emissioni di CO₂ stimate").
         La data di oggi è {self.current_datetime}
 
+        Regole per le ricerche:
+        - Se l'utente non indica date precise (es. "a febbraio", "in primavera"), chiedigliele
+          prima di cercare. Se preferisci procedere, scegli tu le date e scrivi chiaramente
+          all'inizio della risposta quali hai usato e che può chiederne altre.
+        - Se l'utente chiede voli diretti usa nonstop_only; se chiede i più economici usa
+          cheapest_first, sia per i voli sia per gli hotel.
+        - Il prezzo massimo degli hotel si applica per notte: se l'utente dà un budget totale,
+          dividilo per il numero di notti, usa max_price_per_night e spiega il calcolo.
+        - Non è possibile filtrare il numero di camere: cerca con il numero di persone e
+          avvisa l'utente che dovrà verificare la disponibilità delle camere al momento della prenotazione.
+        - Se una ricerca non trova risultati con i filtri richiesti (es. nessun volo diretto),
+          dillo chiaramente e proponi l'alternativa più vicina.
+
         Usa le seguenti istruzioni per creare un output:
 
         Esempio Output Voli:
