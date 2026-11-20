@@ -1,6 +1,6 @@
 import pytest
 
-from travel_agent_api.tools import flights_finder, hotels_finder
+from travel_agent_api.tools import flights_finder, hotels_finder, serpapi_client
 
 FLIGHT = {"departure_airport": "BRI", "arrival_airport": "AMS",
           "outbound_date": "2027-02-10", "return_date": "2027-02-14"}
@@ -20,8 +20,7 @@ def sent_params(monkeypatch):
         def get_dict(self):
             return {}
 
-    monkeypatch.setattr(flights_finder, "GoogleSearch", FakeSearch)
-    monkeypatch.setattr(hotels_finder, "GoogleSearch", FakeSearch)
+    monkeypatch.setattr(serpapi_client, "GoogleSearch", FakeSearch)
     return sent
 
 

@@ -1,8 +1,13 @@
-from langchain_core.tools import tool
-from travel_agent_api.llm import get_chat_model
+import logging
+import time
+
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.tools import tool
 from pydantic import BaseModel, Field
-from typing import Optional
+
+from travel_agent_api.llm import get_chat_model
+
+logger = logging.getLogger(__name__)
 
 
 class TravelPlanInput(BaseModel):
@@ -13,15 +18,15 @@ class TravelPlanInput(BaseModel):
         description="The end date of the trip (YYYY-MM-DD) e.g. 2024-12-19."
     )
     destination: str = Field(description="The destination of the trip.")
-    adults: Optional[int] = Field(1, description="The number of adults. Defaults to 1.")
-    children: Optional[int] = Field(
+    adults: int | None = Field(1, description="The number of adults. Defaults to 1.")
+    children: int | None = Field(
         0, description="The number of children. Defaults to 0."
     )
     travel_style: str = Field(
         description="The style of travel. e.g. adventure, relax, culture, "
         "backpacking, luxury, family-friendly."
     )
-    budget: Optional[int] = Field(None, description="The total budget for the trip.")
+    budget: int | None = Field(None, description="The total budget for the trip.")
     activities: str = Field(
         description="The preferred activities. e.g. culture, nature, food, shopping."
     )
@@ -58,6 +63,7 @@ def chain_travel_plan(params: TravelPlanInput) -> TravelPlanOutput:
     Returns:
         TravelPlanOutput: The generated travel plan content.
     """
+    start = time.perf_counter()
     model = get_chat_model(light=True)
 
     system_prompt = f"""
@@ -83,8 +89,6 @@ def chain_travel_plan(params: TravelPlanInput) -> TravelPlanOutput:
     result = chain.invoke(input=system_prompt)
 
     # Tracing
-    print("*" * 80)
-    print("chain_travel_plan")
-    print("*" * 80)
+    logger.info("chain_travel_plan: %d giorni in %.1fs", len(result.travel_plan), time.perf_counter() - start)
 
     return result

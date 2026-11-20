@@ -1,11 +1,12 @@
 import logging
 import os
-from langchain_core.tools import tool
-from serpapi import GoogleSearch
+import time
+
 from dotenv import load_dotenv
+from langchain_core.tools import tool
 from pydantic import BaseModel, Field
-from typing import Optional
-from enum import IntEnum
+
+from travel_agent_api.tools import serpapi_client
 
 load_dotenv()
 
@@ -33,13 +34,6 @@ def _summarize_hotel(hotel: dict) -> dict:
     }
 
 
-class HotelClassEnum(IntEnum):
-    TWO = 2
-    THREE = 3
-    FOUR = 4
-    FIVE = 5
-
-
 class HotelsInput(BaseModel):
     q: str = Field(description="Location of the hotel.")
     check_in_date: str = Field(
@@ -48,14 +42,14 @@ class HotelsInput(BaseModel):
     check_out_date: str = Field(
         description="The return date (YYYY-MM-DD) e.g. 2024-12-19."
     )
-    adults: Optional[int] = Field(1, description="The number of adults. Defaults to 1.")
-    children: Optional[int] = Field(
+    adults: int | None = Field(1, description="The number of adults. Defaults to 1.")
+    children: int | None = Field(
         0, description="The number of children. Defaults to 0."
     )
-    hotel_class: Optional[int] = Field(
+    hotel_class: int | None = Field(
         2, description="The hotel class available from 2 to 5. Defaults to 2."
     )
-    max_price_per_night: Optional[int] = Field(
+    max_price_per_night: int | None = Field(
         None,
         description="Maximum price per night in EUR. If the user gives a total budget, "
         "divide it by the number of nights.",
@@ -88,6 +82,7 @@ def hotels_finder(params: HotelsInput):
         dict: A dictionary containing the hotels info. If the API call fails, it returns an error message.
     """
 
+    start = time.perf_counter()
     search_params = {
         "api_key": os.getenv("SERPAPI_API_KEY"),
         "engine": "google_hotels",
@@ -107,15 +102,16 @@ def hotels_finder(params: HotelsInput):
         search_params["sort_by"] = "3"  # 3 = prezzo più basso
 
     try:
-        search = GoogleSearch(search_params)
-        properties = search.get_dict().get("properties", [])
+        properties = serpapi_client.search(search_params).get("properties", [])
         results = [_summarize_hotel(hotel) for hotel in properties[:MAX_HOTELS]]
+    except serpapi_client.SerpApiError as e:
+        # Prima diventava una lista vuota: l'agente rispondeva "nessun hotel" anche con la chiave sbagliata
+        logger.error("SerpApi ha rifiutato la ricerca hotel: %s", e)
+        results = {"error": "Ricerca hotel non disponibile al momento."}
     except Exception as e:
         # Il messaggio dell'errore può contenere l'URL con la api_key: non va né al modello né nel log
         logger.error("Errore SerpApi nella ricerca hotel: %s", type(e).__name__)
         results = {"error": "Ricerca hotel non disponibile al momento."}
 
-    print("*" * 80)
-    print("hotels_finder")
-    print("*" * 80)
+    logger.info("hotels_finder completato in %.1fs", time.perf_counter() - start)
     return results

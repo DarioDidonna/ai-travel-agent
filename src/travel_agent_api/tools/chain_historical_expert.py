@@ -1,6 +1,12 @@
+import logging
+import time
+
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.tools import tool
+
 from travel_agent_api.llm import get_chat_model
+
+logger = logging.getLogger(__name__)
 
 
 @tool
@@ -16,6 +22,7 @@ def chain_historical_expert(input_text: str) -> str:
     Returns:
         str: Il contenuto generato dal modello.
     """
+    start = time.perf_counter()
     model = get_chat_model(light=True)
 
     system_prompt = """
@@ -38,8 +45,6 @@ def chain_historical_expert(input_text: str) -> str:
     result = chain.invoke({"input": input_text, "system_prompt": system_prompt})
 
     # Tracing
-    print("*" * 80)
-    print("chain_historical_expert")
-    print("*" * 80)
+    logger.info("chain_historical_expert completato in %.1fs", time.perf_counter() - start)
 
     return result.text

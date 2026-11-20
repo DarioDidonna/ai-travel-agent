@@ -1,10 +1,12 @@
 import logging
 import os
+import time
+
 from dotenv import load_dotenv
 from langchain_core.tools import tool
-from serpapi import GoogleSearch
-from pydantic import BaseModel , Field
-from typing import Optional
+from pydantic import BaseModel, Field
+
+from travel_agent_api.tools import serpapi_client
 
 load_dotenv()
 
@@ -46,22 +48,22 @@ class FlightsInput(BaseModel):
     arrival_airport: str = Field(description="The arrival airport code (IATA).")
     outbound_date: str = Field(description="The outbound date (YYYY-MM-DD) e.g. 2024-12-13.")
     return_date: str = Field(description="The return date (YYYY-MM-DD) e.g. 2024-12-19.")
-    adults: Optional[int] = Field(1, description="The number of adults. Defaults to 1.")
-    children: Optional[int] = Field(0, description="The number of children. Defaults to 0.")
+    adults: int | None = Field(1, description="The number of adults. Defaults to 1.")
+    children: int | None = Field(0, description="The number of children. Defaults to 0.")
     nonstop_only: bool = Field(
         False, description="Set to true only when the user asks for direct / nonstop flights."
     )
     cheapest_first: bool = Field(
         False, description="Set to true when the user asks for the cheapest flights: results sorted by price."
     )
-    max_price: Optional[int] = Field(
+    max_price: int | None = Field(
         None, description="Maximum total price in EUR for the round trip, only if the user gives a flight budget."
     )
 
 class FlightsInputSchema(BaseModel):
     params : FlightsInput
-    
-    
+
+
 @tool(args_schema=FlightsInputSchema)
 def flights_finder(params: FlightsInput):
     """
@@ -79,6 +81,7 @@ def flights_finder(params: FlightsInput):
     Returns:
         dict: A dictionary containing the flights info. If the API call fails, it returns an error message.
     """
+    start = time.perf_counter()
     try:
         search_params = {
             "api_key": os.getenv("SERPAPI_API_KEY"),
@@ -99,18 +102,20 @@ def flights_finder(params: FlightsInput):
             search_params["sort_by"] = "2"  # 2 = prezzo
         if params.max_price:
             search_params["max_price"] = str(params.max_price)
-        search = GoogleSearch(search_params)
-        
-        print("*" * 80)
-        print("flights_finder")
-        print("*" * 80)
-        return _summarize_flights(search.get_dict())
+        summary = _summarize_flights(serpapi_client.search(search_params))
 
+        logger.info("flights_finder: %d opzioni in %.1fs", len(summary["flights"]), time.perf_counter() - start)
+        return summary
+
+    except serpapi_client.SerpApiError as e:
+        # Chiave non valida, quota esaurita…: il messaggio di SerpApi è sicuro da registrare
+        logger.error("SerpApi ha rifiutato la ricerca voli: %s", e)
+        return {"error": "Ricerca voli non disponibile al momento."}
     except Exception as e:
         # Il messaggio dell'errore può contenere l'URL con la api_key: non va né al modello né nel log
         logger.error("Errore SerpApi nella ricerca voli: %s", type(e).__name__)
         return {"error": "Ricerca voli non disponibile al momento."}
-    
-    
-    
-    
+
+
+
+

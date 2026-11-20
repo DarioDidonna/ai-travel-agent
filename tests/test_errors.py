@@ -6,7 +6,7 @@ from langchain_core.exceptions import ModelAPIError, ModelRateLimitError
 
 from travel_agent_api.main import app
 from travel_agent_api.routes import chat_router
-from travel_agent_api.tools import flights_finder, hotels_finder
+from travel_agent_api.tools import flights_finder, hotels_finder, serpapi_client
 
 URL = "/chat/travel-agent"
 BODY = {"messages": [{"role": "user", "content": "Vorrei andare a Roma"}]}
@@ -97,7 +97,7 @@ class BrokenSearch:
     ids=["voli", "hotel"],
 )
 def test_errore_serpapi_non_espone_la_chiave(monkeypatch, module, tool, params):
-    monkeypatch.setattr(module, "GoogleSearch", BrokenSearch)
+    monkeypatch.setattr(serpapi_client, "GoogleSearch", BrokenSearch)
 
     result = tool.invoke({"params": params})
 
