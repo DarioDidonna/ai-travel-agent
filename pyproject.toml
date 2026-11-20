@@ -3,9 +3,11 @@ name = "travel-agent-api"
 version = "0.1.0"
 description = "Agente AI per la pianificazione di viaggi: FastAPI + LangChain, voli e hotel reali via SerpApi, modelli Gemini/OpenAI/Ollama"
 authors = [
-    {name = "Dario Didonna",email = "tuaemail@example.com"}
+    {name = "Dario Didonna"}
 ]
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.11,<3.13"
 dependencies = [
     "fastapi (>=0.162.5,<0.163.0)",
@@ -27,5 +29,24 @@ build-backend = "poetry.core.masonry.api"
 
 [dependency-groups]
 dev = [
-    "pytest (>=9.2.0,<10.0.0)"
+    "pytest (>=9.2.0,<10.0.0)",
+    "ruff (>=0.17.6,<0.18.0)",
+    "pytest-cov (>=7.1.0,<8.0.0)"
 ]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+# E/W: stile PEP 8, F: errori (import inutilizzati, nomi non definiti), I: ordine degli import,
+# B: bug comuni (bugbear), UP: sintassi Python moderna
+select = ["E", "W", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+addopts = "--cov=travel_agent_api --cov-report=term-missing"
+
+[tool.coverage.report]
+skip_covered = true
+# La CI fallisce se la copertura scende sotto questa soglia
+fail_under = 90

@@ -13,6 +13,11 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # Le versioni dichiarate in pyproject.toml (requires-python = ">=3.11,<3.13")
+        python-version: ["3.11", "3.12"]
 
     steps:
       # Action fissate al commit esatto: un tag può essere spostato, uno SHA no
@@ -20,7 +25,7 @@ jobs:
 
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
 
       - name: Installa Poetry
         run: pipx install poetry==2.4.3
@@ -28,9 +33,34 @@ jobs:
       - name: Installa le dipendenze (dal poetry.lock)
         run: poetry install --no-interaction
 
-      # I test simulano l'agente e SerpApi: non servono chiavi né chiamate esterne
-      - name: Test
+      - name: Lint (ruff)
+        run: poetry run ruff check .
+
+      # I test simulano l'agente e SerpApi: non servono chiavi né chiamate esterne.
+      # La copertura minima è impostata in pyproject.toml (fail_under)
+      - name: Test e copertura
         run: poetry run pytest -q
 
       - name: Controllo vulnerabilità delle dipendenze
         run: pipx run pip-audit --path "$(poetry run python -c 'import site; print(site.getsitepackages()[0])')"
+
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Costruisci l'immagine
+        run: docker build -t ai-travel-agent .
+
+      # Avvia il container senza chiavi: /health non chiama servizi esterni
+      - name: Controlla che il container risponda
+        run: |
+          docker run -d --name app -p 8080:8080 ai-travel-agent
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8080/health && exit 0
+            sleep 1
+          done
+          docker logs app
+          exit 1
