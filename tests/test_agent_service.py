@@ -10,8 +10,9 @@ class FakeExecutor:
         self.reply = reply
         self.received = None
 
-    def invoke(self, state):
+    def invoke(self, state, config=None):
         self.received = state
+        self.config = config
         return {"messages": [HumanMessage(m["content"]) for m in state["messages"]] + [self.reply]}
 
 
@@ -19,8 +20,8 @@ def build_agent(monkeypatch, reply):
     captured = {}
     executor = FakeExecutor(reply)
 
-    def fake_create_agent(model, tools, system_prompt):
-        captured.update(model=model, tools=tools, system_prompt=system_prompt)
+    def fake_create_agent(model, tools, system_prompt, middleware=()):
+        captured.update(model=model, tools=tools, system_prompt=system_prompt, middleware=middleware)
         return executor
 
     monkeypatch.setattr(agent_service, "get_chat_model", lambda: "modello-finto")
@@ -34,7 +35,7 @@ def test_prompt_di_sistema_passato_a_create_agent(monkeypatch):
     assert captured["model"] == "modello-finto"
     assert len(captured["tools"]) == 4
     assert "Sei un travel planner" in captured["system_prompt"]
-    assert str(agent.current_datetime.date()) in captured["system_prompt"]
+    assert agent.today.isoformat() in captured["system_prompt"]
 
 
 def test_prompt_spiega_come_gestire_richieste_vaghe_o_non_supportate(monkeypatch):
@@ -65,3 +66,28 @@ def test_contenuto_a_blocchi_riportato_a_testo(monkeypatch):
     result = agent.run([{"role": "user", "content": "Ciao"}])
 
     assert result == "Ciao Roma"
+
+
+def test_consumo_limitato_per_ogni_richiesta(monkeypatch):
+    """OWASP LLM10: una sola richiesta non può far fare all'agente chiamate senza limite."""
+    _, _, captured = build_agent(monkeypatch, AIMessage("ok"))
+    limits = {type(m).__name__: m for m in captured["middleware"]}
+
+    assert limits["ModelCallLimitMiddleware"].run_limit == agent_service.MAX_MODEL_CALLS
+    assert limits["ToolCallLimitMiddleware"].run_limit == agent_service.MAX_TOOL_CALLS
+    assert agent_service.MAX_MODEL_CALLS <= 10
+    assert agent_service.MAX_TOOL_CALLS <= 10
+
+
+def test_limite_di_passi_passato_all_esecuzione(monkeypatch):
+    agent, executor, _ = build_agent(monkeypatch, AIMessage("ok"))
+
+    agent.run([{"role": "user", "content": "Ciao"}])
+
+    assert executor.config == {"recursion_limit": agent_service.RECURSION_LIMIT}
+
+
+def test_nel_prompt_solo_la_data_non_l_ora(monkeypatch):
+    agent, _, captured = build_agent(monkeypatch, AIMessage("ok"))
+
+    assert f"La data di oggi è {agent.today.isoformat()}\n" in captured["system_prompt"]
