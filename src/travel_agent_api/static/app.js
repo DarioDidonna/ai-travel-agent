@@ -2,8 +2,12 @@
 
 const API_URL = "/chat/travel-agent";
 const KEY_STORAGE = "travel-agent-api-key";
+// Come MAX_ASSISTANT_MESSAGE_LENGTH lato server: le risposte tornano indietro come storico
+const MAX_ASSISTANT_CHARS = 12000;
 
 const history = [];
+// Cambia a ogni "Nuova chat": le risposte arrivate dopo appartengono alla chat precedente
+let conversationId = 0;
 const chat = document.getElementById("chat");
 const messages = document.getElementById("messages");
 const welcome = document.getElementById("welcome");
@@ -13,14 +17,15 @@ const send = document.getElementById("send");
 const keyRow = document.getElementById("key-row");
 const keyInput = document.getElementById("api-key");
 
-// La chiave è facoltativa: il campo compare solo se il server risponde 401
+// La chiave è facoltativa: il campo compare solo se il server risponde 401.
+// sessionStorage: la chiave sparisce quando si chiude la scheda
 try {
-  const saved = localStorage.getItem(KEY_STORAGE);
+  const saved = sessionStorage.getItem(KEY_STORAGE);
   if (saved) {
     keyInput.value = saved;
     keyRow.hidden = false;
   }
-} catch (_) { /* localStorage non disponibile */ }
+} catch (_) { /* sessionStorage non disponibile */ }
 
 // Il testo del modello non è fidato: markdown -> HTML, poi sanificato con DOMPurify
 function renderMarkdown(text) {
@@ -101,6 +106,7 @@ async function errorMessage(response) {
 }
 
 async function ask(text) {
+  const requestConversation = conversationId;
   history.push({ role: "user", content: text });
   addMessage("user", text);
   send.disabled = true;
@@ -110,7 +116,7 @@ async function ask(text) {
   const key = keyInput.value.trim();
   if (key) {
     headers["X-API-Key"] = key;
-    try { localStorage.setItem(KEY_STORAGE, key); } catch (_) { /* ignora */ }
+    try { sessionStorage.setItem(KEY_STORAGE, key); } catch (_) { /* ignora */ }
   }
 
   try {
@@ -121,16 +127,19 @@ async function ask(text) {
       body: JSON.stringify({ messages: history.slice(-30) }),
     });
     stopTyping();
+    if (requestConversation !== conversationId) return;
     if (!response.ok) {
       history.pop();
       addMessage("error", await errorMessage(response));
       return;
     }
     const reply = await response.json();
-    history.push({ role: "assistant", content: reply.content });
+    if (requestConversation !== conversationId) return;
+    history.push({ role: "assistant", content: reply.content.slice(0, MAX_ASSISTANT_CHARS) });
     addMessage("assistant", reply.content);
   } catch (_) {
     stopTyping();
+    if (requestConversation !== conversationId) return;
     history.pop();
     addMessage("error", "Impossibile contattare il server. Controlla che sia in esecuzione.");
   } finally {
@@ -167,7 +176,9 @@ document.querySelectorAll(".example").forEach((button) => {
 });
 
 document.getElementById("new-chat").addEventListener("click", () => {
+  conversationId += 1;
   history.length = 0;
+  send.disabled = false;
   messages.replaceChildren();
   welcome.hidden = false;
   input.focus();

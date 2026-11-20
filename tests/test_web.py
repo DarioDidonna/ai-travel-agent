@@ -68,3 +68,38 @@ def test_health_risponde_senza_chiamare_servizi_esterni(client, monkeypatch):
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_permissions_policy_su_tutte_le_risposte(client):
+    assert client.get("/").headers["permissions-policy"] == "camera=(), microphone=(), geolocation=()"
+
+
+def test_hsts_solo_in_produzione(client, monkeypatch):
+    assert "strict-transport-security" not in client.get("/health").headers
+
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("API_ACCESS_KEY", "chiave")
+    headers = client.get("/health").headers
+
+    assert headers["strict-transport-security"] == "max-age=31536000; includeSubDomains"
+
+
+def test_la_pagina_non_tiene_la_chiave_dopo_la_chiusura_del_browser(client):
+    script = client.get("/static/app.js").text
+
+    assert "localStorage" not in script
+    assert "sessionStorage" in script
+
+
+def test_la_pagina_scarta_le_risposte_di_una_chat_precedente(client):
+    """Se l'utente preme "Nuova chat" durante l'attesa, la vecchia risposta non deve finire nella nuova chat."""
+    script = client.get("/static/app.js").text
+
+    assert "conversationId" in script
+    assert "if (requestConversation !== conversationId) return;" in script
+
+
+def test_la_pagina_limita_le_risposte_rimandate_al_server(client):
+    script = client.get("/static/app.js").text
+
+    assert "MAX_ASSISTANT_CHARS" in script
