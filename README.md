@@ -9,7 +9,9 @@ Un **agente AI che organizza viaggi**: capisce la richiesta in linguaggio natura
 
 Backend in **FastAPI + LangChain**, modello **Gemini** (piano gratuito) intercambiabile con OpenAI od Ollama, con una piccola pagina di chat per provarlo dal browser.
 
-![Pagina di chat con una risposta su voli Milano–Parigi](docs/images/chat-flights.png)
+![Demo: richiesta di un volo diretto Milano–Parigi e di un itinerario, con la risposta dell'agente](docs/images/demo.gif)
+
+<sub>Risposta reale dell'agente (voli da Google Flights tramite SerpApi). L'attesa è accorciata: un viaggio completo richiede di solito 30–90 secondi.</sub>
 
 ## Cosa fa
 
