@@ -58,3 +58,13 @@ def test_la_pagina_sanifica_il_markdown_del_modello(client):
     assert "DOMPurify.sanitize(" in script
     assert script.count("innerHTML") == 1
     assert "bubble.innerHTML = renderMarkdown(content)" in script
+
+
+def test_health_risponde_senza_chiamare_servizi_esterni(client, monkeypatch):
+    """Usato da Docker e dagli hosting per sapere se il server è vivo."""
+    monkeypatch.setenv("API_ACCESS_KEY", "chiave")  # non serve la chiave per /health
+
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}

@@ -11,6 +11,19 @@ WINDOW_SECONDS = 60
 DEFAULT_RATE_LIMIT_PER_MINUTE = 5
 
 
+def is_production() -> bool:
+    return os.getenv("APP_ENV", "").lower() == "production"
+
+
+def validate_settings() -> None:
+    """In produzione l'API non deve mai partire aperta a tutti per una variabile dimenticata."""
+    if is_production() and not os.getenv("API_ACCESS_KEY"):
+        raise RuntimeError(
+            "APP_ENV=production richiede API_ACCESS_KEY: senza chiave chiunque potrebbe "
+            "consumare le quote di Gemini e SerpApi."
+        )
+
+
 def verify_api_key(x_api_key: str | None = Header(default=None)) -> None:
     """
     Richiede l'header X-API-Key se nel .env è impostata API_ACCESS_KEY.

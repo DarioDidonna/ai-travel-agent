@@ -1,0 +1,13 @@
+# Segreti: le chiavi arrivano al container da docker compose (env_file), mai nell'immagine
+.env
+.env.*
+!.env.example
+
+.git
+.github
+.venv
+.vscode
+.pytest_cache
+**/__pycache__
+docs
+tests

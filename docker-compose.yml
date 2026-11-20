@@ -1,0 +1,9 @@
+services:
+  api:
+    build: .
+    image: ai-travel-agent
+    ports:
+      - "${PORT:-8080}:8080"
+    # Le chiavi vengono lette dal .env al momento dell'avvio, non sono copiate nell'immagine
+    env_file: .env
+    restart: unless-stopped
