@@ -20,8 +20,9 @@ logging.basicConfig(
 DEFAULT_CORS_ORIGINS = "http://localhost:8000,http://127.0.0.1:8000"
 STATIC_DIR = Path(__file__).parent / "static"
 
-# 30 messaggi da 4000 caratteri stanno ampiamente sotto questo limite
-MAX_BODY_BYTES = 512 * 1024
+# Anche la conversazione più lunga ammessa (30 messaggi, risposte fino a 12000 caratteri,
+# tutte emoji da 4 byte) resta sotto questo limite
+MAX_BODY_BYTES = 1024 * 1024
 DOCS_PATHS = {"/docs", "/docs/oauth2-redirect", "/redoc", "/openapi.json"}
 
 # Solo file del sito; le immagini degli hotel arrivano da Google (https)
@@ -34,7 +35,12 @@ SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "no-referrer",
+    # La pagina non usa fotocamera, microfono né posizione: il browser li blocca del tutto
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
 }
+
+# Solo in produzione, dove l'API è servita in HTTPS: dice al browser di non usare mai HTTP
+HSTS_HEADER = "max-age=31536000; includeSubDomains"
 
 
 def get_cors_origins() -> list[str]:
@@ -112,6 +118,8 @@ async def add_security_headers(request: Request, call_next):
         response = await call_next(request)
     for name, value in SECURITY_HEADERS.items():
         response.headers.setdefault(name, value)
+    if is_production():
+        response.headers.setdefault("Strict-Transport-Security", HSTS_HEADER)
     return response
 
 

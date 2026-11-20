@@ -2,6 +2,8 @@ from datetime import date
 
 import pytest
 from fastapi.testclient import TestClient
+from langchain.agents.middleware.model_call_limit import ModelCallLimitExceededError
+from langgraph.errors import GraphRecursionError
 
 from travel_agent_api.main import app
 from travel_agent_api.routes import chat_router
@@ -124,3 +126,39 @@ def test_agente_costruito_una_volta_al_giorno(monkeypatch):
     day[0] = date(2027, 1, 11)
     client.post(URL, json={"messages": [user()]})
     assert len(built) == 2
+
+
+def test_conversazione_continua_dopo_una_risposta_lunga(client):
+    """La pagina rimanda indietro le risposte dell'assistente: possono superare i 4000 caratteri dell'utente."""
+    messages = [user(), {"role": "assistant", "content": "a" * 9000}, user("E il ritorno?")]
+
+    response = client.post(URL, json={"messages": messages})
+
+    assert response.status_code == 200
+
+
+def test_messaggio_utente_resta_limitato_a_4000_caratteri(client):
+    messages = [user(), {"role": "assistant", "content": "ok"}, user("a" * 4001)]
+
+    assert client.post(URL, json={"messages": messages}).status_code == 422
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        ModelCallLimitExceededError(thread_count=0, run_count=8, thread_limit=None, run_limit=8),
+        GraphRecursionError("Recursion limit of 40 reached"),
+    ],
+    ids=["troppe-chiamate-al-modello", "troppi-passi"],
+)
+def test_richiesta_troppo_complessa_risponde_422(monkeypatch, error):
+    class LimitedAgent:
+        def run(self, messages):
+            raise error
+
+    monkeypatch.setattr(chat_router, "Agent", LimitedAgent)
+
+    response = TestClient(app, raise_server_exceptions=False).post(URL, json={"messages": [user()]})
+
+    assert response.status_code == 422
+    assert "troppo complessa" in response.json()["detail"]

@@ -82,8 +82,12 @@ def test_body_troppo_grande_senza_content_length_risponde_413(client):
 
 
 def test_conversazione_valida_al_limite_massimo_accettata(client):
-    """30 messaggi da 4000 caratteri devono restare sotto il limite."""
-    messages = [{"role": "user", "content": "è" * 4000} for _ in range(30)]
+    """Caso peggiore valido: 30 messaggi alla lunghezza massima, tutti emoji da 4 byte."""
+    messages = []
+    for _ in range(15):
+        messages.append({"role": "user", "content": "😀" * 4000})
+        messages.append({"role": "assistant", "content": "😀" * 12000})
+    messages[-1] = {"role": "user", "content": "😀" * 4000}
 
     response = client.post(URL, json={"messages": messages})
 

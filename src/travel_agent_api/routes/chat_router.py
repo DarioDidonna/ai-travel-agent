@@ -5,8 +5,10 @@ from functools import lru_cache
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
+from langchain.agents.middleware.model_call_limit import ModelCallLimitExceededError
 from langchain_core.exceptions import ModelAPIError, ModelError, ModelRateLimitError
-from pydantic import BaseModel, Field, StringConstraints, field_validator
+from langgraph.errors import GraphRecursionError
+from pydantic import BaseModel, Field, StringConstraints, field_validator, model_validator
 
 from travel_agent_api.security import rate_limit, verify_api_key
 from travel_agent_api.services.agent_service import Agent
@@ -16,6 +18,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 MAX_MESSAGE_LENGTH = 4000
+# Le risposte dell'assistente tornano indietro come storico e possono essere più lunghe
+MAX_ASSISTANT_MESSAGE_LENGTH = 12000
 MAX_MESSAGES = 30
 
 
@@ -23,8 +27,14 @@ class ChatMessage(BaseModel):
     # Solo user/assistant: i ruoli system/developer/tool sono riservati all'agente
     role: Literal["user", "assistant"]
     content: Annotated[
-        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_MESSAGE_LENGTH)
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_ASSISTANT_MESSAGE_LENGTH)
     ]
+
+    @model_validator(mode="after")
+    def user_message_length(self) -> "ChatMessage":
+        if self.role == "user" and len(self.content) > MAX_MESSAGE_LENGTH:
+            raise ValueError(f"I messaggi dell'utente possono avere al massimo {MAX_MESSAGE_LENGTH} caratteri")
+        return self
 
 
 class ChatCompletionRequest(BaseModel):
@@ -120,6 +130,14 @@ def chat_completion(request: ChatCompletionRequest):
     try:
         agent = get_agent(today())
         reply = agent.run(messages=[message.model_dump() for message in request.messages])
+    except (ModelCallLimitExceededError, GraphRecursionError):
+        # Limiti di consumo raggiunti (OWASP LLM10): la richiesta chiede troppe ricerche in una volta
+        logger.warning("Richiesta interrotta: superati i limiti di chiamate dell'agente")
+        raise HTTPException(
+            status_code=422,
+            detail="La richiesta è troppo complessa per essere elaborata in una volta sola: "
+            "dividila in domande più semplici.",
+        ) from None
     except ModelError as error:
         # Gemini/OpenAI/Ollama non raggiungibile, quota esaurita, chiave non valida...
         logger.exception("Errore del provider del modello")
