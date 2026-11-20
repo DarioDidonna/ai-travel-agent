@@ -17,14 +17,15 @@ MAX_FLIGHTS = 5
 
 def _summarize_flights(results: dict) -> dict:
     """Riduce la risposta di SerpApi ai soli campi utili all'agente."""
-    options = results.get("best_flights", []) + results.get("other_flights", [])
+    # SerpApi può restituire campi a null: "or" li trasforma nel valore vuoto
+    options = (results.get("best_flights") or []) + (results.get("other_flights") or [])
     flights = []
     for option in options[:MAX_FLIGHTS]:
         flights.append({
             "price": option.get("price"),
             "total_duration": option.get("total_duration"),
-            "carbon_emissions_kg": (option.get("carbon_emissions") or {}).get("this_flight", 0) // 1000,
-            "layovers": [layover.get("name") for layover in option.get("layovers", [])],
+            "carbon_emissions_kg": ((option.get("carbon_emissions") or {}).get("this_flight") or 0) // 1000,
+            "layovers": [layover.get("name") for layover in option.get("layovers") or []],
             "legs": [
                 {
                     "airline": leg.get("airline"),
@@ -33,23 +34,33 @@ def _summarize_flights(results: dict) -> dict:
                     "arrival": leg.get("arrival_airport"),
                     "duration": leg.get("duration"),
                 }
-                for leg in option.get("flights", [])
+                for leg in option.get("flights") or []
             ],
         })
     return {
-        "google_flights_url": results.get("search_metadata", {}).get("google_flights_url"),
+        "google_flights_url": (results.get("search_metadata") or {}).get("google_flights_url"),
         "error": results.get("error"),
         "flights": flights,
     }
 
 
 class FlightsInput(BaseModel):
-    departure_airport: str = Field(description="The departure airport code (IATA).")
-    arrival_airport: str = Field(description="The arrival airport code (IATA).")
-    outbound_date: str = Field(description="The outbound date (YYYY-MM-DD) e.g. 2024-12-13.")
-    return_date: str = Field(description="The return date (YYYY-MM-DD) e.g. 2024-12-19.")
-    adults: int | None = Field(1, description="The number of adults. Defaults to 1.")
-    children: int | None = Field(0, description="The number of children. Defaults to 0.")
+    departure_airport: str = Field(
+        description="The departure airport code (IATA, 3 uppercase letters) e.g. LIN.",
+        pattern=serpapi_client.IATA_PATTERN,
+    )
+    arrival_airport: str = Field(
+        description="The arrival airport code (IATA, 3 uppercase letters) e.g. CDG.",
+        pattern=serpapi_client.IATA_PATTERN,
+    )
+    outbound_date: str = Field(
+        description="The outbound date (YYYY-MM-DD) e.g. 2024-12-13.", pattern=serpapi_client.DATE_PATTERN
+    )
+    return_date: str = Field(
+        description="The return date (YYYY-MM-DD) e.g. 2024-12-19.", pattern=serpapi_client.DATE_PATTERN
+    )
+    adults: int = Field(1, description="The number of adults. Defaults to 1.", ge=1, le=serpapi_client.MAX_PASSENGERS)
+    children: int = Field(0, description="The number of children. Defaults to 0.", ge=0, le=8)
     nonstop_only: bool = Field(
         False, description="Set to true only when the user asks for direct / nonstop flights."
     )
@@ -57,7 +68,9 @@ class FlightsInput(BaseModel):
         False, description="Set to true when the user asks for the cheapest flights: results sorted by price."
     )
     max_price: int | None = Field(
-        None, description="Maximum total price in EUR for the round trip, only if the user gives a flight budget."
+        None,
+        description="Maximum total price in EUR for the round trip, only if the user gives a flight budget.",
+        ge=1,
     )
 
 class FlightsInputSchema(BaseModel):

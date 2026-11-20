@@ -25,3 +25,10 @@ def search(params: dict) -> dict:
         # Il messaggio di errore di SerpApi non contiene la chiave
         raise SerpApiError(results["error"])
     return results
+
+
+# Formati degli argomenti che il modello passa ai tool: se non li rispetta riceve
+# l'errore di validazione e può correggersi, senza che parta una ricerca inutile
+DATE_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
+IATA_PATTERN = r"^[A-Z]{3}$"
+MAX_PASSENGERS = 9  # limite di Google Flights per prenotazione

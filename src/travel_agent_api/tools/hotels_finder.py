@@ -30,29 +30,37 @@ def _summarize_hotel(hotel: dict) -> dict:
         "check_out_time": hotel.get("check_out_time"),
         "overall_rating": hotel.get("overall_rating"),
         "reviews": hotel.get("reviews"),
-        "amenities": hotel.get("amenities", [])[:8],
+        "amenities": (hotel.get("amenities") or [])[:8],
     }
 
 
 class HotelsInput(BaseModel):
-    q: str = Field(description="Location of the hotel.")
+    q: str = Field(description="Location of the hotel.", min_length=1, max_length=100)
     check_in_date: str = Field(
-        description="The outbound date (YYYY-MM-DD) e.g. 2024-12-13."
+        description="The check-in date (YYYY-MM-DD) e.g. 2024-12-13.", pattern=serpapi_client.DATE_PATTERN
     )
     check_out_date: str = Field(
-        description="The return date (YYYY-MM-DD) e.g. 2024-12-19."
+        description="The check-out date (YYYY-MM-DD) e.g. 2024-12-19.", pattern=serpapi_client.DATE_PATTERN
     )
-    adults: int | None = Field(1, description="The number of adults. Defaults to 1.")
-    children: int | None = Field(
-        0, description="The number of children. Defaults to 0."
+    adults: int = Field(1, description="The number of adults. Defaults to 1.", ge=1, le=serpapi_client.MAX_PASSENGERS)
+    children: int = Field(0, description="The number of children. Defaults to 0.", ge=0, le=8)
+    children_ages: str | None = Field(
+        None,
+        description="Comma-separated age of each child (1-17), e.g. '5,9'. Required when children > 0: "
+        "ask the user if you don't know them.",
+        pattern=r"^\d{1,2}(,\d{1,2})*$",
     )
-    hotel_class: int | None = Field(
-        2, description="The hotel class available from 2 to 5. Defaults to 2."
+    hotel_class: str | None = Field(
+        None,
+        description="Only if the user asks for a star rating. Comma-separated star classes from 2 to 5: "
+        "'4' for 4-star only, '3,4,5' for at least 3 stars.",
+        pattern=r"^[2-5](,[2-5])*$",
     )
     max_price_per_night: int | None = Field(
         None,
         description="Maximum price per night in EUR. If the user gives a total budget, "
         "divide it by the number of nights.",
+        ge=1,
     )
     cheapest_first: bool = Field(
         False, description="Set to true when the user asks for the cheapest hotels: results sorted by price."
@@ -73,7 +81,8 @@ def hotels_finder(params: HotelsInput):
         check_out_date (str): The return date (YYYY-MM-DD) e.g. 2024-12-19.
         adults (int): The number of adults. Defaults to 1.
         children (int): The number of children. Defaults to 0.
-        hotel_class (int): The hotel class available from 2 to 5. Defaults to 2.
+        children_ages (str): Age of each child, required when children > 0.
+        hotel_class (str): Star classes, e.g. '3,4,5'. Optional: no filter by default.
         max_price_per_night (int): Maximum price per night in EUR. Optional.
         cheapest_first (bool): Sort results by price. Defaults to false.
     Note:
@@ -81,6 +90,10 @@ def hotels_finder(params: HotelsInput):
     Returns:
         dict: A dictionary containing the hotels info. If the API call fails, it returns an error message.
     """
+
+    if params.children and len((params.children_ages or "").split(",")) != params.children:
+        # SerpApi rifiuterebbe la ricerca: meglio far chiedere le età all'utente
+        return {"error": "Per cercare hotel con bambini serve l'età di ogni bambino: chiedila all'utente."}
 
     start = time.perf_counter()
     search_params = {
@@ -94,8 +107,12 @@ def hotels_finder(params: HotelsInput):
         "check_out_date": params.check_out_date,
         "adults": params.adults,
         "children": params.children,
-        "hotel_class": params.hotel_class,
     }
+    if params.children:
+        search_params["children_ages"] = params.children_ages
+    # Senza filtro di default: hotel_class=2 per SerpApi significa "solo 2 stelle"
+    if params.hotel_class:
+        search_params["hotel_class"] = params.hotel_class
     if params.max_price_per_night:
         search_params["max_price"] = str(params.max_price_per_night)
     if params.cheapest_first:
