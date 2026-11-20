@@ -1,9 +1,13 @@
 import logging
+import time
+from datetime import date
+from functools import lru_cache
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from langchain_core.exceptions import ModelAPIError, ModelError, ModelRateLimitError
 from pydantic import BaseModel, Field, StringConstraints, field_validator
+
 from travel_agent_api.security import rate_limit, verify_api_key
 from travel_agent_api.services.agent_service import Agent
 
@@ -23,7 +27,7 @@ class ChatMessage(BaseModel):
     ]
 
 
-class ChatComplentionRequest(BaseModel):
+class ChatCompletionRequest(BaseModel):
     messages: list[ChatMessage] = Field(min_length=1, max_length=MAX_MESSAGES)
 
     @field_validator("messages")
@@ -50,6 +54,19 @@ class ChatComplentionRequest(BaseModel):
 class ChatCompletionResponse(BaseModel):
     role: Literal["assistant"] = "assistant"
     content: str
+
+
+def today() -> date:
+    return date.today()
+
+
+@lru_cache(maxsize=1)
+def get_agent(day: date) -> Agent:
+    """
+    Costruisce l'agente una volta al giorno invece che a ogni richiesta.
+    Il prompt contiene la data di oggi: cambiando giorno, cambia la chiave e l'agente si ricostruisce.
+    """
+    return Agent()
 
 
 def provider_unavailable(error: ModelError) -> HTTPException:
@@ -84,13 +101,13 @@ def provider_unavailable(error: ModelError) -> HTTPException:
         503: {"description": "Servizio di intelligenza artificiale non disponibile"},
     },
 )
-def chat_completion(request: ChatComplentionRequest):
+def chat_completion(request: ChatCompletionRequest):
     """
     Endpoint per la gestione delle richieste di chat.
     Processa i messaggi ricevuti e restituisce la risposta finale dell'agente di viaggio.
 
     Args:
-        request (ChatComplentionRequest): La richiesta contenente i messaggi della conversazione
+        request (ChatCompletionRequest): La richiesta contenente i messaggi della conversazione
 
     Returns:
         ChatCompletionResponse: La risposta dell'assistente, in markdown
@@ -99,20 +116,18 @@ def chat_completion(request: ChatComplentionRequest):
         HTTPException: In caso di errori durante l'elaborazione della richiesta
     """
 
+    start = time.perf_counter()
     try:
-        agent = Agent()
+        agent = get_agent(today())
         reply = agent.run(messages=[message.model_dump() for message in request.messages])
     except ModelError as error:
         # Gemini/OpenAI/Ollama non raggiungibile, quota esaurita, chiave non valida...
         logger.exception("Errore del provider del modello")
-        raise provider_unavailable(error)
+        raise provider_unavailable(error) from error
     except Exception:
         # I dettagli restano nel log del server, al client arriva un messaggio generico
         logger.exception("Errore imprevisto durante l'elaborazione della chat")
-        raise HTTPException(status_code=500, detail="Si è verificato un errore interno. Riprova più tardi.")
+        raise HTTPException(status_code=500, detail="Si è verificato un errore interno. Riprova più tardi.") from None
 
-    print("*" * 80)
-    print("chat_completion")
-    print("*" * 80)
+    logger.info("Risposta dell'agente generata in %.1fs", time.perf_counter() - start)
     return ChatCompletionResponse(content=reply)
-    

@@ -1,3 +1,5 @@
+from datetime import date
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -100,3 +102,25 @@ def test_ultimo_messaggio_deve_essere_dell_utente(client):
 
     assert response.status_code == 422
     assert FakeAgent.received is None
+
+
+def test_agente_costruito_una_volta_al_giorno(monkeypatch):
+    """Il prompt contiene la data di oggi: l'agente si riusa per tutto il giorno e si ricostruisce il giorno dopo."""
+    built = []
+
+    class CountingAgent(FakeAgent):
+        def __init__(self):
+            built.append(1)
+
+    monkeypatch.setattr(chat_router, "Agent", CountingAgent)
+    day = [date(2027, 1, 10)]
+    monkeypatch.setattr(chat_router, "today", lambda: day[0])
+    client = TestClient(app)
+
+    client.post(URL, json={"messages": [user()]})
+    client.post(URL, json={"messages": [user()]})
+    assert len(built) == 1
+
+    day[0] = date(2027, 1, 11)
+    client.post(URL, json={"messages": [user()]})
+    assert len(built) == 2

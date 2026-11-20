@@ -1,13 +1,14 @@
 from datetime import datetime
 
-from travel_agent_api.llm import get_chat_model
 from langchain.agents import create_agent
+
+from travel_agent_api.llm import get_chat_model
+from travel_agent_api.tools.chain_historical_expert import chain_historical_expert
+from travel_agent_api.tools.chain_travel_plan import chain_travel_plan
 
 # Tools
 from travel_agent_api.tools.flights_finder import flights_finder
 from travel_agent_api.tools.hotels_finder import hotels_finder
-from travel_agent_api.tools.chain_historical_expert import chain_historical_expert
-from travel_agent_api.tools.chain_travel_plan import chain_travel_plan
 
 FLIGHTS_OUTPUT = """
 format: markdown
