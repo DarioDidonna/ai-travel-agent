@@ -51,14 +51,16 @@ flowchart LR
 | Rischio | Contromisura |
 |---|---|
 | Prompt injection tramite messaggi `system` | Lo schema accetta solo i ruoli `user` e `assistant` |
-| Input enormi o malformati | Validazione Pydantic: da 1 a 30 messaggi, ciascuno da 1 a 4000 caratteri → **422** |
+| Input enormi o malformati | Validazione Pydantic: da 1 a 30 messaggi, fino a 4000 caratteri per l'utente (12000 per le risposte rimandate come storico) → **422** |
+| Consumo illimitato in una richiesta (OWASP LLM10) | Al massimo 8 chiamate al modello e 8 ricerche per richiesta, anche se il modello ne chiede di più in parallelo; oltre → risposta con i dati raccolti o **422** |
+| Argomenti dei tool scritti dal modello | Formato validato (codici IATA, date `YYYY-MM-DD`, numeri di persone): se sbagliati l'errore torna al modello, senza ricerche inutili |
 | Consumo delle quote da parte di terzi | Chiave di accesso facoltativa (`X-API-Key`, confronto a tempo costante) e limite di richieste per IP → **401** / **429** |
 | Fuga di chiavi negli errori | Gli errori di SerpApi (il cui URL contiene `api_key`) non arrivano né al modello né ai log; ai client arrivano solo messaggi generici |
 | XSS dalle risposte del modello | Il markdown viene sanificato con DOMPurify e la pagina ha una Content Security Policy rigida (nessuno script inline) |
-| Header e CORS | `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`; origini CORS esplicite e configurabili |
+| Header e CORS | `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`, HSTS in produzione; origini CORS esplicite e configurabili |
 | Segreti | Le chiavi stanno solo nel `.env`, escluso da git e dall'immagine Docker; `pip-audit` non rileva vulnerabilità note |
 | API messa online per errore senza chiave | Con `APP_ENV=production` il server non parte senza `API_ACCESS_KEY` e `/docs` è disattivato |
-| Body enormi | Oltre 512 KB → **413**, contando i byte ricevuti (non basta falsificare `Content-Length`) |
+| Body enormi | Oltre 1 MB → **413**, contando i byte ricevuti (non basta falsificare `Content-Length`) |
 | Servizi esterni lenti | Timeout di 20 s su SerpApi (la libreria di default attende ~17 ore) e al massimo 2 tentativi verso Gemini |
 
 ## Avvio rapido
@@ -137,8 +139,8 @@ Risposta `200`:
 | Codice | Quando |
 |---|---|
 | `401` | `API_ACCESS_KEY` è impostata e l'header `X-API-Key` manca o è sbagliato |
-| `422` | Messaggi non validi (ruolo, lunghezza, numero, ultimo messaggio non dell'utente) |
-| `413` | Richiesta oltre 512 KB |
+| `422` | Messaggi non validi (ruolo, lunghezza, numero, ultimo messaggio non dell'utente) oppure richiesta che supera i limiti di consumo dell'agente |
+| `413` | Richiesta oltre 1 MB |
 | `429` | Limite di richieste superato; l'header `Retry-After` indica quanti secondi attendere |
 | `503` | Il provider del modello non è disponibile: sovraccarico o troppe richieste (`Retry-After: 60`) oppure quota giornaliera esaurita |
 
@@ -157,7 +159,7 @@ poetry run pytest          # test e copertura
 poetry run ruff check .    # lint
 ```
 
-88 test automatici con **copertura del 99%**, eseguiti in meno di un secondo e **senza chiamate a servizi esterni**: l'agente, il modello e SerpApi vengono simulati. Coprono validazione, sicurezza (chiave, rate limit, CORS, header, fuga di chiavi, modalità produzione, dimensione del body), errori dei servizi esterni (timeout, chiave non valida, quote), filtri di ricerca, scelta del modello e pagina web.
+124 test automatici con **copertura del 99%**, eseguiti in meno di un secondo e **senza chiamate a servizi esterni**: l'agente, il modello e SerpApi vengono simulati. Coprono validazione, sicurezza (chiave, rate limit, CORS, header, fuga di chiavi, modalità produzione, dimensione del body), errori dei servizi esterni (timeout, chiave non valida, quote), limiti di consumo dell'agente (con l'agente LangChain reale e un modello simulato), filtri di ricerca, scelta del modello e pagina web.
 
 La CI esegue a ogni push lint, test e copertura (minimo 90%) su Python 3.11 e 3.12, `pip-audit` e la costruzione dell'immagine Docker con un controllo su `/health`.
 
@@ -182,6 +184,7 @@ Dockerfile, docker-compose.yml # immagine multi-stage, utente non root, healthch
 - **Tempi di risposta:** da circa 20 secondi a qualche minuto, a seconda del modello e del carico dei server di Google.
 - **Rate limit in memoria:** vale per un singolo processo. Con più istanze servirebbe uno store condiviso (ad esempio Redis). Dietro un proxy va impostato `FORWARDED_ALLOW_IPS`, altrimenti tutti i client risultano con l'IP del proxy.
 - **Camere degli hotel:** Google Hotels non permette di filtrare il numero di camere; l'agente cerca per numero di persone e lo segnala.
+- **Confronti su molte date:** per restare nei limiti di consumo l'agente cerca al massimo 3–4 date per risposta e dichiara quali ha scelto.
 - **Privacy:** con il piano gratuito di Gemini, Google può usare i dati inviati per migliorare i suoi prodotti; non inviare dati personali reali.
 
 ## Stack
